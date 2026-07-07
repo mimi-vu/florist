@@ -60,16 +60,12 @@ Desktop.ini
 # Copy renamed files into frontend/public/models/flowers/ for the app to serve.
 3d-flower-files/
 
-# Runtime flower models (served by Vite from public/). Too large for plain git;
-# use Git LFS, a download script, or copy from 3d-flower-files/ after clone.
-frontend/public/models/**/*.glb
-frontend/public/models/**/*.gltf
-frontend/public/models/**/*.bin
+# Runtime models in public/ ARE tracked — required for Vercel to serve flowers.
+# (Duplicate source archive above stays ignored.)
 
 # Keep the folder structure so clones know where to put assets
 !frontend/public/models/
 !frontend/public/models/flowers/
-!frontend/public/models/flowers/.gitkeep
 
 # --- Misc -------------------------------------------------------------------
 *.local
