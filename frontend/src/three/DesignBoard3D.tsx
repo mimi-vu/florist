@@ -1,24 +1,23 @@
 import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment, ContactShadows, Html } from '@react-three/drei';
+import { OrbitControls, Environment, Html } from '@react-three/drei';
 import { GLTFExporter, type OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import type { FlowerId, PlacedFlower as PlacedFlowerT, Selection, Vessel } from '../types';
-import { Flower3D } from './Flower3D';
+import type { FlowerId, PlacedFlower as PlacedFlowerT, Selection, Vessel, BoardMode } from '../types';
+import { Flower3D, DEFAULT_FLOWER_BOUNDS, type FlowerBounds } from './Flower3D';
 import { Vase3D } from './Vase3D';
 import { Wrap3D } from './Wrap3D';
 import { FLOWERS } from '../data/catalog';
 
 const MAX_RADIUS = 5.5;   // circular boundary for X/Z on the board
 const MAX_HEIGHT = 4.5;   // upper limit for flower elevation
-const BOX_W = 1.4;
-const BOX_H = 3.3;        // wireframe height & where the tilt handle sits
-const BOX_D = 1.4;
 
 interface Props {
   placed: PlacedFlowerT[];
   vessel: Vessel;
   selection: Selection;
+  boardMode: BoardMode;
+  onBoardModeChange: (mode: BoardMode) => void;
   boardColor: string;
   backgroundColor: string;
   draggingFlowerId: FlowerId | null;
@@ -32,6 +31,12 @@ interface Props {
   onSetScale: (uid: string, scale: number) => void;
   onBringForward: (uid: string) => void;
   onRemove: (uid: string) => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  onBeginEdit: () => void;
+  onEndEdit: () => void;
 }
 
 export function DesignBoard3D(props: Props) {
@@ -39,6 +44,8 @@ export function DesignBoard3D(props: Props) {
     placed,
     vessel,
     selection,
+    boardMode,
+    onBoardModeChange,
     boardColor,
     backgroundColor,
     draggingFlowerId,
@@ -52,11 +59,16 @@ export function DesignBoard3D(props: Props) {
     onSetScale,
     onBringForward,
     onRemove,
+    canUndo,
+    canRedo,
+    onUndo,
+    onRedo,
+    onBeginEdit,
+    onEndEdit,
   } = props;
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
-  const [orbitEnabled, setOrbitEnabled] = useState(true);
   const canvasState = useRef<{
     camera: THREE.Camera;
     gl: THREE.WebGLRenderer;
@@ -64,10 +76,7 @@ export function DesignBoard3D(props: Props) {
   } | null>(null);
   const bouquetRef = useRef<THREE.Group>(null);
 
-  // Ghost silhouette shown while a flower is being dragged from the palette.
   const [ghost, setGhost] = useState<{ position: [number, number, number] } | null>(null);
-
-  const resetView = () => controlsRef.current?.reset();
 
   const projectToBoard = (clientX: number, clientY: number): [number, number, number] | null => {
     if (!wrapRef.current || !canvasState.current) return null;
@@ -167,14 +176,12 @@ export function DesignBoard3D(props: Props) {
   }, [withOverlaysHidden]);
 
   const bouquetEmpty = placed.length === 0 && vessel.kind === 'none';
+  const isEditMode = boardMode === 'edit';
 
   return (
     <div className="board-wrap">
       <div className="board-toolbar">
         <div className="board-toolbar-left">
-          <span className="tool-label">View</span>
-          <button className="tool-btn" onClick={resetView} title="Reset camera">⟲</button>
-          <span className="tool-divider" />
           <label className="color-swatch" title="Board disc colour">
             <span className="color-swatch-label">Board</span>
             <input
@@ -193,43 +200,88 @@ export function DesignBoard3D(props: Props) {
             />
             <span className="color-swatch-chip" style={{ background: backgroundColor }} />
           </label>
+          <span className="tool-divider" />
+          <div className="mode-toggle" role="group" aria-label="Board mode">
+            <button
+              type="button"
+              className={`mode-toggle-btn ${boardMode === 'view' ? 'active' : ''}`}
+              onClick={() => onBoardModeChange('view')}
+              title="Orbit and inspect — flowers cannot be selected or edited"
+            >
+              View
+            </button>
+            <button
+              type="button"
+              className={`mode-toggle-btn ${boardMode === 'edit' ? 'active' : ''}`}
+              onClick={() => onBoardModeChange('edit')}
+              title="Move, resize, and tilt flowers — scene rotation is locked"
+            >
+              Edit
+            </button>
+          </div>
         </div>
         <div className="board-toolbar-right">
-          <span className="tool-label">
-            Drag flower to move · drag corners to resize · drag top handle to tilt
-          </span>
+          <button
+            type="button"
+            className="tool-btn history-btn"
+            onClick={onUndo}
+            disabled={!isEditMode || !canUndo}
+            title="Undo (Ctrl+Z)"
+            aria-label="Undo"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 7H5v4M5 11c1.5-3 4.5-5 8-5a6 6 0 110 12H9"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="tool-btn history-btn"
+            onClick={onRedo}
+            disabled={!isEditMode || !canRedo}
+            title="Redo (Ctrl+Shift+Z)"
+            aria-label="Redo"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 7h4v4M19 11c-1.5-3-4.5-5-8-5a6 6 0 100 12h4"
+              />
+            </svg>
+          </button>
         </div>
       </div>
 
       <div
         ref={wrapRef}
-        className={`board-stage ${draggingFlowerId ? 'is-dragging' : ''}`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
+        className={`board-stage ${isEditMode ? 'mode-edit' : 'mode-view'} ${
+          draggingFlowerId && isEditMode ? 'is-dragging' : ''
+        }`}
+        onDrop={isEditMode ? handleDrop : undefined}
+        onDragOver={isEditMode ? handleDragOver : undefined}
+        onDragLeave={isEditMode ? handleDragLeave : undefined}
       >
         <Canvas
-          shadows
           camera={{ position: [4.5, 4, 6.5], fov: 42 }}
           dpr={[1, 2]}
           gl={{ preserveDrawingBuffer: true, antialias: true }}
-          onPointerMissed={() => onSelect(null)}
+          onPointerMissed={isEditMode ? () => onSelect(null) : undefined}
         >
           <color attach="background" args={[backgroundColor]} />
 
           <ambientLight intensity={0.35} />
           <hemisphereLight args={['#fff8ef', '#c9b98a', 0.4]} />
-          <directionalLight
-            position={[6, 9, 5]}
-            intensity={1.15}
-            castShadow
-            shadow-mapSize-width={2048}
-            shadow-mapSize-height={2048}
-            shadow-camera-left={-8}
-            shadow-camera-right={8}
-            shadow-camera-top={8}
-            shadow-camera-bottom={-8}
-          />
+          <directionalLight position={[6, 9, 5]} intensity={1.15} />
           <directionalLight position={[-5, 4, -3]} intensity={0.35} color="#e8d5a8" />
 
           <Suspense fallback={<LoadingFallback />}>
@@ -237,14 +289,6 @@ export function DesignBoard3D(props: Props) {
           </Suspense>
 
           <BoardSurface color={boardColor} />
-          <ContactShadows
-            position={[0, 0.001, 0]}
-            opacity={0.35}
-            scale={12}
-            blur={2.5}
-            far={5}
-            resolution={1024}
-          />
 
           {/* Everything that should end up in the exported GLB lives inside
               this group. Board disc, environment, shadows, and helpers are
@@ -267,18 +311,19 @@ export function DesignBoard3D(props: Props) {
               <Suspense key={pf.uid} fallback={<StemPlaceholder position={pf.position} />}>
                 <PlacedFlower3D
                   placed={pf}
-                  selected={selection?.kind === 'flower' && selection.uid === pf.uid}
+                  editable={isEditMode}
+                  selected={isEditMode && selection?.kind === 'flower' && selection.uid === pf.uid}
                   onSelectFlower={(uid) => {
                     onSelect({ kind: 'flower', uid });
                     onBringForward(uid);
                   }}
-                  onDragStart={() => setOrbitEnabled(false)}
-                  onDragEnd={() => setOrbitEnabled(true)}
                   onSetPosition={(pos) => onSetPosition(pf.uid, pos)}
                   onSetRotationY={(r) => onSetRotationY(pf.uid, r)}
                   onSetTilt={(tx, tz) => onSetTilt(pf.uid, tx, tz)}
                   onSetScale={(s) => onSetScale(pf.uid, s)}
                   onDelete={() => onRemove(pf.uid)}
+                  onBeginEdit={onBeginEdit}
+                  onEndEdit={onEndEdit}
                 />
               </Suspense>
             ))}
@@ -286,7 +331,7 @@ export function DesignBoard3D(props: Props) {
 
           {bouquetEmpty && !draggingFlowerId && <EmptyHint />}
 
-          {draggingFlowerId && ghost && (
+          {draggingFlowerId && isEditMode && ghost && (
             <DropPreview
               position={ghost.position}
               tint={
@@ -297,7 +342,7 @@ export function DesignBoard3D(props: Props) {
 
           <OrbitControls
             ref={controlsRef}
-            enabled={orbitEnabled}
+            enabled={boardMode === 'view'}
             enablePan
             enableDamping
             dampingFactor={0.08}
@@ -348,15 +393,6 @@ export function DesignBoard3D(props: Props) {
             </svg>
             <span>3D model</span>
           </button>
-        </div>
-
-        <div className="orbit-hint">
-          <strong>Drag scene</strong> to orbit · <strong>scroll</strong> to zoom ·
-          <strong> right-drag</strong> to pan.
-          <br />
-          Drag a flower to move it (rotate the scene to a side view to lift it up
-          or down). Drag the top handle to tilt, corners to resize. Click a
-          selected flower again to select whichever one is behind it.
         </div>
       </div>
     </div>
@@ -463,15 +499,16 @@ function clamp(n: number, lo: number, hi: number) {
 
 interface PlacedProps {
   placed: PlacedFlowerT;
+  editable: boolean;
   selected: boolean;
   onSelectFlower: (uid: string) => void;
-  onDragStart: () => void;
-  onDragEnd: () => void;
   onSetPosition: (pos: [number, number, number]) => void;
   onSetRotationY: (rotationY: number) => void;
   onSetTilt: (tiltX: number, tiltZ: number) => void;
   onSetScale: (scale: number) => void;
   onDelete: () => void;
+  onBeginEdit: () => void;
+  onEndEdit: () => void;
 }
 
 function findOtherFlowerUid(
@@ -492,14 +529,15 @@ function findOtherFlowerUid(
 
 function PlacedFlower3D({
   placed,
+  editable,
   selected,
   onSelectFlower,
-  onDragStart,
-  onDragEnd,
   onSetPosition,
   onSetTilt,
   onSetScale,
   onDelete,
+  onBeginEdit,
+  onEndEdit,
 }: PlacedProps) {
   const { camera, gl } = useThree();
 
@@ -527,7 +565,11 @@ function PlacedFlower3D({
     startY: number;
   } | null>(null);
 
+  const [bounds, setBounds] = useState<FlowerBounds>(DEFAULT_FLOWER_BOUNDS);
+  const editStarted = useRef(false);
+
   const handleBodyDown = (e: any) => {
+    if (!editable) return;
     e.stopPropagation();
     clickIntent.current = {
       wasSelected: selected,
@@ -542,15 +584,21 @@ function PlacedFlower3D({
     const cursor = pointerToPlane(e, gl, camera, plane);
     if (!cursor) return;
     bodyDrag.current = { plane, startCursor: cursor.clone(), startPos: start };
-    onDragStart();
     (e.target as Element).setPointerCapture?.(e.pointerId);
     gl.domElement.style.cursor = 'grabbing';
   };
   const handleBodyMove = (e: any) => {
+    if (!editable) return;
     if (clickIntent.current) {
       const dx = e.clientX - clickIntent.current.startX;
       const dy = e.clientY - clickIntent.current.startY;
-      if (dx * dx + dy * dy > 25) clickIntent.current.moved = true;
+      if (dx * dx + dy * dy > 25) {
+        clickIntent.current.moved = true;
+        if (!editStarted.current) {
+          editStarted.current = true;
+          onBeginEdit();
+        }
+      }
     }
     if (!bodyDrag.current) return;
     e.stopPropagation();
@@ -567,11 +615,15 @@ function PlacedFlower3D({
     onSetPosition([cx, ny, cz]);
   };
   const handleBodyUp = (e: any) => {
+    if (!editable) return;
     e.stopPropagation();
     if (bodyDrag.current) {
       bodyDrag.current = null;
-      onDragEnd();
       gl.domElement.style.cursor = '';
+    }
+    if (editStarted.current) {
+      editStarted.current = false;
+      onEndEdit();
     }
     // If this was a plain click (no drag) on an already-selected flower,
     // try to cycle to another flower that was under the cursor at click time.
@@ -585,44 +637,49 @@ function PlacedFlower3D({
 
   return (
     <group position={placed.position} userData={{ flowerUid: placed.uid }}>
-      {/* Tilt applied in world frame — dragging the tilt handle in a given
-          world direction leans the flower that way regardless of yaw. */}
       <group rotation={[placed.tiltX, 0, placed.tiltZ]}>
         <group rotation-y={placed.rotationY}>
           <group
             scale={placed.scale}
-            onPointerDown={handleBodyDown}
-            onPointerMove={handleBodyMove}
-            onPointerUp={handleBodyUp}
-            onPointerCancel={handleBodyUp}
+            {...(editable
+              ? {
+                  onPointerDown: handleBodyDown,
+                  onPointerMove: handleBodyMove,
+                  onPointerUp: handleBodyUp,
+                  onPointerCancel: handleBodyUp,
+                }
+              : {})}
           >
-            <Flower3D flowerId={placed.flowerId} selected={selected} />
+            <Flower3D
+              flowerId={placed.flowerId}
+              selected={selected}
+              interactive={editable}
+              onBoundsChange={setBounds}
+            />
+
+            {editable && selected && <SelectionWireframe bounds={bounds} />}
+
+            {editable && selected && (
+              <>
+                <CornerHandles
+                  bounds={bounds}
+                  flowerScale={placed.scale}
+                  stemBase={placed.position}
+                  onSetScale={onSetScale}
+                  onBeginEdit={onBeginEdit}
+                  onEndEdit={onEndEdit}
+                />
+                <TiltHandle
+                  bounds={bounds}
+                  stemBase={placed.position}
+                  onSetTilt={onSetTilt}
+                  onBeginEdit={onBeginEdit}
+                  onEndEdit={onEndEdit}
+                />
+                <FloatingFlowerToolbar anchorY={bounds.height + 0.9} onDelete={onDelete} />
+              </>
+            )}
           </group>
-
-          {selected && <SelectionWireframe scale={placed.scale} />}
-
-          {selected && (
-            <>
-              <CornerHandles
-                scale={placed.scale}
-                stemBase={placed.position}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-                onSetScale={onSetScale}
-              />
-              <TiltHandle
-                scale={placed.scale}
-                stemBase={placed.position}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-                onSetTilt={onSetTilt}
-              />
-              <FloatingFlowerToolbar
-                anchorY={BOX_H * placed.scale + 0.9}
-                onDelete={onDelete}
-              />
-            </>
-          )}
         </group>
       </group>
     </group>
@@ -634,10 +691,8 @@ function PlacedFlower3D({
    <CornerHandles> so they carry their own pointer events.
    ================================================================ */
 
-function SelectionWireframe({ scale }: { scale: number }) {
-  const w = BOX_W * scale;
-  const h = BOX_H * scale;
-  const d = BOX_D * scale;
+function SelectionWireframe({ bounds }: { bounds: FlowerBounds }) {
+  const { width: w, height: h, depth: d } = bounds;
   const edges = useMemo(
     () => new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)),
     [w, h, d]
@@ -660,21 +715,21 @@ function SelectionWireframe({ scale }: { scale: number }) {
    ================================================================ */
 
 function CornerHandles({
-  scale,
+  bounds,
+  flowerScale,
   stemBase,
-  onDragStart,
-  onDragEnd,
   onSetScale,
+  onBeginEdit,
+  onEndEdit,
 }: {
-  scale: number;
+  bounds: FlowerBounds;
+  flowerScale: number;
   stemBase: [number, number, number];
-  onDragStart: () => void;
-  onDragEnd: () => void;
   onSetScale: (scale: number) => void;
+  onBeginEdit: () => void;
+  onEndEdit: () => void;
 }) {
-  const w = BOX_W * scale;
-  const h = BOX_H * scale;
-  const d = BOX_D * scale;
+  const { width: w, height: h, depth: d } = bounds;
   const hw = w / 2, hh = h / 2, hd = d / 2;
 
   const corners: [number, number, number][] = [];
@@ -695,11 +750,11 @@ function CornerHandles({
           key={i}
           position={pos}
           size={handleSize}
-          scale={scale}
+          flowerScale={flowerScale}
           stemBase={stemBase}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
           onSetScale={onSetScale}
+          onBeginEdit={onBeginEdit}
+          onEndEdit={onEndEdit}
         />
       ))}
     </group>
@@ -709,19 +764,19 @@ function CornerHandles({
 function CornerHandle({
   position,
   size,
-  scale,
+  flowerScale,
   stemBase,
-  onDragStart,
-  onDragEnd,
   onSetScale,
+  onBeginEdit,
+  onEndEdit,
 }: {
   position: [number, number, number];
   size: number;
-  scale: number;
+  flowerScale: number;
   stemBase: [number, number, number];
-  onDragStart: () => void;
-  onDragEnd: () => void;
   onSetScale: (scale: number) => void;
+  onBeginEdit: () => void;
+  onEndEdit: () => void;
 }) {
   const { camera, gl } = useThree();
   const meshRef = useRef<THREE.Mesh>(null);
@@ -742,6 +797,7 @@ function CornerHandle({
 
   const handleDown = (e: any) => {
     e.stopPropagation();
+    onBeginEdit();
     const cornerWorld = worldOf(meshRef.current);
     const stem = new THREE.Vector3(...stemBase);
     // Full 3D direction from base to corner — this includes the Y component,
@@ -750,7 +806,7 @@ function CornerHandle({
     const cornerDist = dir3.length();
     if (cornerDist < 0.02) return;
     dir3.divideScalar(cornerDist);
-    const refDist = cornerDist / scale;
+    const refDist = cornerDist / flowerScale;
 
     // Camera-facing plane keeps the raycast stable regardless of view angle,
     // where a horizontal plane can flip / go unstable near horizontal camera.
@@ -765,7 +821,6 @@ function CornerHandle({
       dir: dir3,
       plane,
     };
-    onDragStart();
     (e.target as Element).setPointerCapture?.(e.pointerId);
     gl.domElement.style.cursor = 'nwse-resize';
   };
@@ -786,8 +841,8 @@ function CornerHandle({
     if (!drag.current) return;
     e.stopPropagation();
     drag.current = null;
-    onDragEnd();
     gl.domElement.style.cursor = '';
+    onEndEdit();
   };
 
   const s = size * (hover ? 1.4 : 1);
@@ -825,17 +880,17 @@ function CornerHandle({
    ================================================================ */
 
 function TiltHandle({
-  scale,
+  bounds,
   stemBase,
-  onDragStart,
-  onDragEnd,
   onSetTilt,
+  onBeginEdit,
+  onEndEdit,
 }: {
-  scale: number;
+  bounds: FlowerBounds;
   stemBase: [number, number, number];
-  onDragStart: () => void;
-  onDragEnd: () => void;
   onSetTilt: (tiltX: number, tiltZ: number) => void;
+  onBeginEdit: () => void;
+  onEndEdit: () => void;
 }) {
   const { camera, gl } = useThree();
   const meshRef = useRef<THREE.Mesh>(null);
@@ -847,10 +902,11 @@ function TiltHandle({
     H: number;
   } | null>(null);
 
-  const topLocalY = BOX_H * scale;
+  const topLocalY = bounds.height;
 
   const handleDown = (e: any) => {
     e.stopPropagation();
+    onBeginEdit();
     // Current world position of the handle (accounts for existing tilt + yaw).
     const sphereWorld = new THREE.Vector3();
     meshRef.current?.getWorldPosition(sphereWorld);
@@ -865,9 +921,8 @@ function TiltHandle({
     drag.current = {
       grip,
       plane,
-      H: BOX_H * scale, // sphere distance from base = wireframe height
+      H: bounds.height,
     };
-    onDragStart();
     (e.target as Element).setPointerCapture?.(e.pointerId);
     gl.domElement.style.cursor = 'move';
   };
@@ -912,8 +967,8 @@ function TiltHandle({
     if (!drag.current) return;
     e.stopPropagation();
     drag.current = null;
-    onDragEnd();
     gl.domElement.style.cursor = '';
+    onEndEdit();
   };
 
   const r = hover ? 0.19 : 0.16;
@@ -999,7 +1054,7 @@ function FloatingFlowerToolbar({ anchorY, onDelete }: ToolbarProps) {
 
 function BoardSurface({ color }: { color: string }) {
   return (
-    <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+    <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <circleGeometry args={[6, 64]} />
       <meshStandardMaterial color={color} roughness={0.85} metalness={0} />
     </mesh>
@@ -1027,7 +1082,7 @@ function EmptyHint() {
 function LoadingFallback() {
   return (
     <Html center>
-      <div className="loading">Loading 3D scene…</div>
+      <div className="loading">Loading</div>
     </Html>
   );
 }

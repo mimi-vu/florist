@@ -4,11 +4,12 @@ import { VASES, WRAPS } from '../data/catalog';
 interface Props {
   flowerCount: number;
   vessel: Vessel;
+  editMode: boolean;
   onClear: () => void;
   onShowTutorial: () => void;
 }
 
-export function Header({ flowerCount, vessel, onClear, onShowTutorial }: Props) {
+export function Header({ flowerCount, vessel, editMode, onClear, onShowTutorial }: Props) {
   const vesselLabel =
     vessel.kind === 'vase'
       ? VASES.find((v) => v.id === vessel.id)?.name
@@ -32,7 +33,7 @@ export function Header({ flowerCount, vessel, onClear, onShowTutorial }: Props) 
         </svg>
         <div>
           <span className="brand-name">Florist Studio</span>
-          <span className="brand-tag">Design before you cut</span>
+          <span className="brand-tag">Design your flower arrangements</span>
         </div>
       </div>
 
@@ -60,7 +61,9 @@ export function Header({ flowerCount, vessel, onClear, onShowTutorial }: Props) 
           </svg>
           <span>Tutorial</span>
         </button>
-        <button className="btn btn-ghost" onClick={onClear}>Clear board</button>
+        <button className="btn btn-ghost" onClick={onClear} disabled={!editMode}>
+          Clear board
+        </button>
       </div>
     </header>
   );

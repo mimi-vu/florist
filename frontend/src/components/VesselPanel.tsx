@@ -10,15 +10,26 @@ type VesselChoice =
   | { kind: 'none' };
 
 interface Props {
+  editMode: boolean;
   vessel: Vessel;
   onChange: (v: VesselChoice) => void;
   onSetScale: (scale: number) => void;
   onRemove: () => void;
+  onBeginEdit: () => void;
+  onEndEdit: () => void;
 }
 
 type Tab = 'vases' | 'wraps';
 
-export function VesselPanel({ vessel, onChange, onSetScale, onRemove }: Props) {
+export function VesselPanel({
+  editMode,
+  vessel,
+  onChange,
+  onSetScale,
+  onRemove,
+  onBeginEdit,
+  onEndEdit,
+}: Props) {
   const [tab, setTab] = useState<Tab>(vessel.kind === 'wrap' ? 'wraps' : 'vases');
 
   const activeName =
@@ -29,10 +40,15 @@ export function VesselPanel({ vessel, onChange, onSetScale, onRemove }: Props) {
       : null;
 
   return (
-    <aside className="vessels">
+    <aside className={`vessels ${editMode ? '' : 'vessels-readonly'}`}>
       <div className="vessels-header">
         <h2 className="vessels-title">Vessel</h2>
       </div>
+      {!editMode && (
+        <p className="vessels-readonly-hint">
+          View mode — switch to Edit to change the vessel.
+        </p>
+      )}
 
       {vessel.kind !== 'none' && (
         <div className="vessel-active">
@@ -46,13 +62,14 @@ export function VesselPanel({ vessel, onChange, onSetScale, onRemove }: Props) {
               step={0.02}
               value={vessel.scale}
               onChange={(e) => onSetScale(Number(e.target.value))}
+              onPointerDown={onBeginEdit}
+              onPointerUp={onEndEdit}
+              onPointerCancel={onEndEdit}
               className="vessel-slider"
+              disabled={!editMode}
             />
             <span className="vessel-active-value">{vessel.scale.toFixed(2)}×</span>
           </div>
-          <button className="vessel-clear" onClick={onRemove}>
-            Remove vessel · loose stems
-          </button>
         </div>
       )}
 
@@ -76,13 +93,14 @@ export function VesselPanel({ vessel, onChange, onSetScale, onRemove }: Props) {
           VASES.map((v) => {
             const selected = vessel.kind === 'vase' && vessel.id === v.id;
             return (
-              <button
-                key={v.id}
-                className={`vessel-card ${selected ? 'selected' : ''}`}
-                onClick={() =>
-                  onChange(selected ? { kind: 'none' } : { kind: 'vase', id: v.id })
-                }
-              >
+                  <button
+                    key={v.id}
+                    className={`vessel-card ${selected ? 'selected' : ''}`}
+                    disabled={!editMode}
+                    onClick={() =>
+                      editMode && onChange(selected ? { kind: 'none' } : { kind: 'vase', id: v.id })
+                    }
+                  >
                 <div className="vessel-card-svg">
                   <VaseSVG id={v.id} uid={`sel-${v.id}`} height={100} />
                 </div>
@@ -95,13 +113,14 @@ export function VesselPanel({ vessel, onChange, onSetScale, onRemove }: Props) {
           WRAPS.map((w) => {
             const selected = vessel.kind === 'wrap' && vessel.id === w.id;
             return (
-              <button
-                key={w.id}
-                className={`vessel-card ${selected ? 'selected' : ''}`}
-                onClick={() =>
-                  onChange(selected ? { kind: 'none' } : { kind: 'wrap', id: w.id })
-                }
-              >
+                  <button
+                    key={w.id}
+                    className={`vessel-card ${selected ? 'selected' : ''}`}
+                    disabled={!editMode}
+                    onClick={() =>
+                      editMode && onChange(selected ? { kind: 'none' } : { kind: 'wrap', id: w.id })
+                    }
+                  >
                 <div className="vessel-card-svg">
                   <WrapSVG id={w.id} uid={`sel-${w.id}`} height={100} />
                 </div>

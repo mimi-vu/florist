@@ -10,13 +10,13 @@ const STEPS: Step[] = [
   {
     title: 'Welcome to Florist Studio',
     body:
-      'Design bouquets in 3D before you cut a single stem. This quick tour will show you how everything fits together — it takes under a minute.',
+      'Design flower arrangments in 3D. This quick tour will show you how everything works.',
     illustration: <BouquetIllo />,
   },
   {
     title: 'Add flowers',
     body:
-      'Drag a flower from the left panel to drop it exactly where you want on the board, or click a card to drop it near the centre. Repeated clicks stagger the stems so they never land on top of each other.',
+      'Drag a flower from the left panel to drop it exactly where you want on the board, or click to drop it near the centre.',
     illustration: <ClickIllo />,
   },
   {

@@ -3,31 +3,42 @@ import { FLOWERS } from '../data/catalog';
 import type { FlowerId } from '../types';
 
 interface Props {
+  editMode: boolean;
   onQuickAdd: (id: FlowerId) => void;
   onDragStartFlower: (id: FlowerId) => void;
   onDragEndFlower: () => void;
 }
 
-export function FlowerPalette({ onQuickAdd, onDragStartFlower, onDragEndFlower }: Props) {
+export function FlowerPalette({ editMode, onQuickAdd, onDragStartFlower, onDragEndFlower }: Props) {
   const [query, setQuery] = useState('');
 
   const filtered = FLOWERS.filter((f) => {
     const q = query.toLowerCase();
     return f.name.toLowerCase().includes(q) || f.latin.toLowerCase().includes(q);
   });
+  const flora = filtered.filter((f) => f.category !== 'fauna');
+  const fauna = filtered.filter((f) => f.category === 'fauna');
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: FlowerId) => {
+    if (!editMode) {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData('application/x-florist-flower', id);
     e.dataTransfer.effectAllowed = 'copy';
     onDragStartFlower(id);
   };
 
   return (
-    <aside className="palette">
+    <aside className={`palette ${editMode ? '' : 'palette-readonly'}`}>
       <div className="palette-header">
-        <h2 className="palette-title">Flowers</h2>
-        <div className="palette-sub">Drag onto the board · click to drop near centre</div>
+        <h2 className="palette-title">Flora</h2>
       </div>
+      {!editMode && (
+        <p className="palette-readonly-hint">
+          View mode — switch to Edit to add or drag stems.
+        </p>
+      )}
       <div className="palette-controls">
         <input
           className="palette-search"
@@ -37,26 +48,81 @@ export function FlowerPalette({ onQuickAdd, onDragStartFlower, onDragEndFlower }
         />
       </div>
       <div className="palette-list">
-        {filtered.map((f) => (
-          <div
+        {flora.map((f) => (
+          <PaletteCard
             key={f.id}
-            className="flower-card"
-            draggable
-            onDragStart={(e) => handleDragStart(e, f.id)}
+            id={f.id}
+            name={f.name}
+            latin={f.latin}
+            tint={f.tint}
+            editMode={editMode}
+            onQuickAdd={onQuickAdd}
+            onDragStart={handleDragStart}
             onDragEnd={onDragEndFlower}
-            onClick={() => onQuickAdd(f.id)}
-            title={`${f.name} — ${f.latin} · click to add, drag for a specific spot`}
-          >
-            <FlowerIcon tint={f.tint} />
-            <div className="flower-card-body">
-              <div className="flower-card-name">{f.name}</div>
-              <div className="flower-card-latin">{f.latin}</div>
-            </div>
-          </div>
+          />
         ))}
-        {filtered.length === 0 && <div className="palette-empty">No flowers match.</div>}
+        {fauna.length > 0 && (
+          <>
+            <h3 className="palette-sub palette-sub-section">Fauna</h3>
+            {fauna.map((f) => (
+              <PaletteCard
+                key={f.id}
+                id={f.id}
+                name={f.name}
+                latin={f.latin}
+                tint={f.tint}
+                editMode={editMode}
+                onQuickAdd={onQuickAdd}
+                onDragStart={handleDragStart}
+                onDragEnd={onDragEndFlower}
+              />
+            ))}
+          </>
+        )}
+        {filtered.length === 0 && <div className="palette-empty">No stems match.</div>}
       </div>
     </aside>
+  );
+}
+
+function PaletteCard({
+  id,
+  name,
+  latin,
+  tint,
+  editMode,
+  onQuickAdd,
+  onDragStart,
+  onDragEnd,
+}: {
+  id: FlowerId;
+  name: string;
+  latin: string;
+  tint: string;
+  editMode: boolean;
+  onQuickAdd: (id: FlowerId) => void;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>, id: FlowerId) => void;
+  onDragEnd?: () => void;
+}) {
+  return (
+    <div
+      className="flower-card"
+      draggable={editMode}
+      onDragStart={(e) => onDragStart(e, id)}
+      onDragEnd={editMode ? onDragEnd : undefined}
+      onClick={editMode ? () => onQuickAdd(id) : undefined}
+      title={
+        editMode
+          ? `${name} — ${latin} · click to add, drag for a specific spot`
+          : `${name} — ${latin} · view mode (editing disabled)`
+      }
+    >
+      <FlowerIcon tint={tint} />
+      <div className="flower-card-body">
+        <div className="flower-card-name">{name}</div>
+        <div className="flower-card-latin">{latin}</div>
+      </div>
+    </div>
   );
 }
 

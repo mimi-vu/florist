@@ -40,7 +40,7 @@ export function Vase3D({ id }: Props) {
   if (meta.glass) {
     return (
       <group>
-        <mesh geometry={geometry} castShadow receiveShadow>
+        <mesh geometry={geometry}>
           <meshPhysicalMaterial
             color={meta.tint}
             transparent
@@ -64,7 +64,7 @@ export function Vase3D({ id }: Props) {
 
   const isMetal = id === 'vase-brass';
   return (
-    <mesh geometry={geometry} castShadow receiveShadow>
+    <mesh geometry={geometry}>
       <meshStandardMaterial
         color={meta.tint}
         roughness={isMetal ? 0.35 : id === 'vase-black-matte' ? 0.95 : 0.55}

@@ -1,3 +1,5 @@
+export type BoardMode = 'edit' | 'view';
+
 export type FlowerId =
   | 'spider-lily-white'
   | 'spider-lily-gold'
@@ -51,6 +53,8 @@ export interface FlowerMeta {
   seasonal: string;
   hasModel: boolean;
   tint: string;
+  /** Palette grouping — defaults to flora (plants). */
+  category?: 'flora' | 'fauna';
   /** Structured credit — grouped in the palette footer. */
   credit?: Credit;
   /**
@@ -67,6 +71,17 @@ export interface FlowerMeta {
    * If omitted, the whole scene is used.
    */
   modelNode?: string;
+  /** Optional Euler rotation (radians, XYZ) applied before ground normalization. */
+  modelRotation?: [number, number, number];
+  /** Optional child node names to drop after extracting `modelNode`. */
+  excludeNodes?: string[];
+  /** Drop meshes whose glTF material name matches one of these entries. */
+  excludeMaterials?: string[];
+  /**
+   * Merge several named subtrees into one flower (e.g. wisteria blooms + leaves).
+   * Takes precedence over `modelNode` when set.
+   */
+  modelNodes?: string[];
 }
 
 export interface Credit {

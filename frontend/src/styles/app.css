@@ -121,6 +121,11 @@
   text-transform: uppercase;
   margin-top: 4px;
 }
+.palette-sub-section {
+  margin: 14px 8px 4px;
+  padding-top: 10px;
+  border-top: 1px solid #e6dcc9;
+}
 .palette-controls {
   padding: 4px 20px 12px;
   display: flex;
@@ -242,9 +247,13 @@
   justify-content: center;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
-.tool-btn:hover {
+.tool-btn:hover:not(:disabled) {
   background: #f0e5d3;
   border-color: #a5825a;
+}
+.tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .tool-btn.active {
   background: #a5825a;
@@ -309,6 +318,36 @@
   flex-shrink: 0;
 }
 
+.mode-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid #e0d3b8;
+  background: #fff;
+  gap: 2px;
+}
+.mode-toggle-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #6b5a3e;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.mode-toggle-btn:hover:not(.active) {
+  background: #f5eddb;
+}
+.mode-toggle-btn.active {
+  background: #4a3a28;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(74, 58, 40, 0.22);
+}
+
 .board-stage {
   flex: 1;
   position: relative;
@@ -342,6 +381,53 @@
   box-shadow: 0 6px 14px rgba(122, 90, 58, 0.25);
   pointer-events: none;
   z-index: 6;
+}
+
+.board-stage.mode-view canvas {
+  cursor: grab;
+}
+.board-stage.mode-view canvas:active {
+  cursor: grabbing;
+}
+.board-stage.mode-edit canvas {
+  cursor: default;
+}
+
+.palette-readonly-hint,
+.vessels-readonly-hint {
+  font-size: 11px;
+  color: #8a7350;
+  letter-spacing: 0.04em;
+  line-height: 1.45;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  background: #f5efe3;
+  border: 1px solid #e0d3b8;
+  border-radius: 8px;
+}
+.palette-readonly .flower-card {
+  cursor: not-allowed;
+  opacity: 0.65;
+  filter: grayscale(1);
+}
+.palette-readonly .flower-card:hover {
+  transform: none;
+  box-shadow: none;
+}
+.vessels-readonly .vessel-card:disabled,
+.vessels-readonly .vessel-clear:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+.vessels-readonly .vessel-slider:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+.vessels-readonly .vessel-active {
+  filter: grayscale(1);
+  opacity: 0.75;
 }
 
 .orbit-hint {

@@ -25,7 +25,7 @@ export function Wrap3D({ id }: Props) {
   return (
     <group position={[0, 0, 0]}>
       {/* Outer cone */}
-      <mesh geometry={outer} position={[0, 1.6, 0]} castShadow receiveShadow>
+      <mesh geometry={outer} position={[0, 1.6, 0]}>
         {isCellophane ? (
           <meshPhysicalMaterial
             color={meta.tint}
@@ -57,7 +57,7 @@ export function Wrap3D({ id }: Props) {
         />
       </mesh>
       {/* Twine tie at base */}
-      <mesh position={[0, 0.35, 0]} castShadow>
+      <mesh position={[0, 0.35, 0]}>
         <torusGeometry args={[0.55, 0.05, 12, 32]} />
         <meshStandardMaterial color="#8b5a2b" roughness={0.9} />
       </mesh>
