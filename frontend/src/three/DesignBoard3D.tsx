@@ -527,6 +527,17 @@ function findOtherFlowerUid(
   return null;
 }
 
+function isFlowerHandleHit(e: { intersections?: { object: THREE.Object3D }[] }) {
+  for (const hit of e.intersections ?? []) {
+    let obj: THREE.Object3D | null = hit.object;
+    while (obj) {
+      if (obj.userData?.flowerHandle) return true;
+      obj = obj.parent;
+    }
+  }
+  return false;
+}
+
 function PlacedFlower3D({
   placed,
   editable,
@@ -569,7 +580,7 @@ function PlacedFlower3D({
   const editStarted = useRef(false);
 
   const handleBodyDown = (e: any) => {
-    if (!editable) return;
+    if (!editable || isFlowerHandleHit(e)) return;
     e.stopPropagation();
     clickIntent.current = {
       wasSelected: selected,
@@ -589,6 +600,7 @@ function PlacedFlower3D({
   };
   const handleBodyMove = (e: any) => {
     if (!editable) return;
+    if (bodyDrag.current) e.stopPropagation();
     if (clickIntent.current) {
       const dx = e.clientX - clickIntent.current.startX;
       const dy = e.clientY - clickIntent.current.startY;
@@ -744,7 +756,7 @@ function CornerHandles({
   const handleSize = Math.max(0.09, Math.min(w, h, d) * 0.07);
 
   return (
-    <group renderOrder={1000} userData={{ exportSkip: true }}>
+    <group renderOrder={1000} userData={{ exportSkip: true, flowerHandle: true }}>
       {corners.map((pos, i) => (
         <CornerHandle
           key={i}
@@ -872,11 +884,8 @@ function CornerHandle({
 }
 
 /* ================================================================
-   Tilt handle — the ONE rotation control. It's a sphere at the top
-   of the wireframe; drag it in any horizontal direction and the top
-   of the flower follows the cursor, so the flower leans over that
-   way. Uses exact spherical math so the handle stays glued to the
-   cursor throughout the drag.
+   Tilt handle — gold sphere at the top of the wireframe; drag it
+   and the flower leans while the base stays put.
    ================================================================ */
 
 function TiltHandle({
@@ -907,12 +916,8 @@ function TiltHandle({
   const handleDown = (e: any) => {
     e.stopPropagation();
     onBeginEdit();
-    // Current world position of the handle (accounts for existing tilt + yaw).
     const sphereWorld = new THREE.Vector3();
     meshRef.current?.getWorldPosition(sphereWorld);
-    // Camera-facing plane through the handle — stable regardless of camera
-    // angle. Grip records where on the sphere the cursor grabbed, so the
-    // sphere stays glued to the cursor throughout the drag.
     const plane = cameraFacingPlane(camera, sphereWorld);
     const cursor = pointerToPlane(e, gl, camera, plane);
     const grip = cursor
@@ -933,14 +938,11 @@ function TiltHandle({
     const stem = new THREE.Vector3(...stemBase);
     const cursor = pointerToPlane(e, gl, camera, drag.current.plane);
     if (!cursor) return;
-    // Target world XZ of the sphere = cursor minus initial grip offset.
     const targetX = cursor.x - drag.current.grip.dx;
     const targetZ = cursor.z - drag.current.grip.dz;
     let dx = targetX - stem.x;
     let dz = targetZ - stem.z;
 
-    // The sphere can never leave a horizontal circle of radius H around the
-    // base. Clamp just inside so the asin math never saturates at ±90°.
     const H = drag.current.H;
     const maxR = H * 0.9;
     const r = Math.hypot(dx, dz);
@@ -949,14 +951,6 @@ function TiltHandle({
       dz = (dz * maxR) / r;
     }
 
-    // Three's default 'XYZ' Euler applies rotation as R = Rx · Rz when
-    // applied to a column vector — Rz first, then Rx. Starting from (0, H, 0):
-    //   after Rz(θz): (-H·sinθz, H·cosθz, 0)
-    //   after Rx(θx): (-H·sinθz, H·cosθz·cosθx, H·cosθz·sinθx)
-    // So the horizontal offset (dx, dz) of the sphere satisfies:
-    //   dx = -H·sinθz              →  θz = asin(-dx / H)
-    //   dz =  H·cosθz·sinθx        →  θx = asin(dz / (H·cosθz))
-    // Solve tiltZ first, then use the resulting cosθz to solve tiltX.
     const sinZ = clamp(-dx / H, -1, 1);
     const cosZ = Math.sqrt(1 - sinZ * sinZ);
     const sinX = cosZ > 0.001 ? clamp(dz / (H * cosZ), -1, 1) : 0;
@@ -973,15 +967,14 @@ function TiltHandle({
 
   const r = hover ? 0.19 : 0.16;
   return (
-    <group position={[0, topLocalY, 0]} renderOrder={1002} userData={{ exportSkip: true }}>
-      {/* Tiny stalk connecting to the wireframe top so the sphere reads
-          as "the top of the flower" instead of a random floating dot. */}
+    <group position={[0, topLocalY, 0]} renderOrder={1002} userData={{ exportSkip: true, flowerHandle: true }}>
       <mesh position={[0, -0.08, 0]}>
         <cylinderGeometry args={[0.02, 0.02, 0.16, 8]} />
         <meshBasicMaterial color="#f5b301" depthTest={false} />
       </mesh>
       <mesh
         ref={meshRef}
+        userData={{ flowerHandle: true }}
         onPointerDown={handleDown}
         onPointerMove={handleMove}
         onPointerUp={handleUp}
