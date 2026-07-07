@@ -1,0 +1,80 @@
+# =============================================================================
+# Florist Studio — root .gitignore
+# =============================================================================
+
+# --- Dependencies ------------------------------------------------------------
+node_modules/
+
+# --- Build output -----------------------------------------------------------
+frontend/dist/
+backend/dist/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Vite
+frontend/.vite/
+
+# --- Environment & secrets ----------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- Logs & debug -----------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Test / coverage (if added later) ---------------------------------------
+coverage/
+.nyc_output/
+
+# --- OS files ---------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Editors & IDEs ---------------------------------------------------------
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# --- Large 3D assets (~500 MB) ----------------------------------------------
+# Source drops with original Sketchfab filenames — keep locally, not in git.
+# Copy renamed files into frontend/public/models/flowers/ for the app to serve.
+3d-flower-files/
+
+# Runtime flower models (served by Vite from public/). Too large for plain git;
+# use Git LFS, a download script, or copy from 3d-flower-files/ after clone.
+frontend/public/models/**/*.glb
+frontend/public/models/**/*.gltf
+frontend/public/models/**/*.bin
+
+# Keep the folder structure so clones know where to put assets
+!frontend/public/models/
+!frontend/public/models/flowers/
+!frontend/public/models/flowers/.gitkeep
+
+# --- Misc -------------------------------------------------------------------
+*.local
+.cache/
+.temp/
+tmp/
+temp/
+*.tgz
